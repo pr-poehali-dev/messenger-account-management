@@ -1,14 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect } from 'react';
+import AuthScreen from '@/components/messenger/AuthScreen';
+import MessengerApp from '@/components/messenger/MessengerApp';
+import { User } from '@/components/messenger/types';
 
-const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 color-black text-black">Добро пожаловать!</h1>
-        <p className="text-xl text-gray-600">тут будет отображаться ваш проект</p>
-      </div>
-    </div>
-  );
-};
+export default function Index() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-export default Index;
+  useEffect(() => {
+    const saved = localStorage.getItem('vector_current_user');
+    if (saved) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch {
+        localStorage.removeItem('vector_current_user');
+      }
+    }
+  }, []);
+
+  const handleAuth = (user: User) => {
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('vector_current_user');
+    setCurrentUser(null);
+  };
+
+  if (!currentUser) {
+    return <AuthScreen onAuth={handleAuth} />;
+  }
+
+  return <MessengerApp currentUser={currentUser} onLogout={handleLogout} />;
+}
