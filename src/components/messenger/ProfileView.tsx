@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { User } from './types';
+import { api } from '@/lib/api';
 
 interface ProfileViewProps {
   currentUser: User;
@@ -11,17 +12,21 @@ export default function ProfileView({ currentUser, onUpdate }: ProfileViewProps)
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: currentUser.name, bio: currentUser.bio || '', status: currentUser.status || '' });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    const updated = { ...currentUser, ...form };
-    const users = JSON.parse(localStorage.getItem('vector_users') || '[]');
-    const newUsers = users.map((u: User) => u.username === currentUser.username ? updated : u);
-    localStorage.setItem('vector_users', JSON.stringify(newUsers));
-    localStorage.setItem('vector_current_user', JSON.stringify(updated));
-    onUpdate(updated);
-    setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const data = await api.updateProfile(currentUser.id, form.name, form.bio, form.status);
+      const updated = { ...currentUser, ...data.user };
+      localStorage.setItem('vector_current_user', JSON.stringify(updated));
+      onUpdate(updated);
+      setEditing(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -120,8 +125,10 @@ export default function ProfileView({ currentUser, onUpdate }: ProfileViewProps)
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2.5 rounded-xl transition-all text-sm"
+                  disabled={saving}
+                  className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-semibold py-2.5 rounded-xl transition-all text-sm flex items-center justify-center gap-2"
                 >
+                  {saving && <Icon name="Loader" size={14} className="animate-spin" />}
                   Сохранить
                 </button>
               </div>

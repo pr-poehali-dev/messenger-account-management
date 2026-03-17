@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { User } from './types';
+import { api } from '@/lib/api';
 import ChatsView from './ChatsView';
 import ContactsView from './ContactsView';
 import ProfileView from './ProfileView';
@@ -45,8 +46,18 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
   const [addError, setAddError] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
 
-  const allUsers: User[] = JSON.parse(localStorage.getItem('vector_users') || '[]');
-  const otherUsers = allUsers.filter(u => u.username !== currentUser.username);
+  const [addLoading, setAddLoading] = useState(false);
+  const savedAccounts: User[] = JSON.parse(localStorage.getItem('vector_saved_accounts') || '[]');
+  const otherAccounts = savedAccounts.filter(u => u.username !== currentUser.username);
+
+  useEffect(() => {
+    // Сохраняем текущий аккаунт в список сохранённых
+    const saved: User[] = JSON.parse(localStorage.getItem('vector_saved_accounts') || '[]');
+    if (!saved.find(u => u.username === currentUser.username)) {
+      saved.push(currentUser);
+      localStorage.setItem('vector_saved_accounts', JSON.stringify(saved));
+    }
+  }, [currentUser.username]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -68,24 +79,31 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
     onSwitch(user);
   };
 
-  const handleAddAccount = (e: React.FormEvent) => {
+  const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError('');
-    const users: User[] = JSON.parse(localStorage.getItem('vector_users') || '[]');
-
-    if (addMode === 'login') {
-      const found = users.find(u => u.username === addForm.username && u.password === addForm.password);
-      if (!found) { setAddError('Неверный логин или пароль'); return; }
-      if (found.username === currentUser.username) { setAddError('Этот аккаунт уже активен'); return; }
-      handleSwitch(found);
-    } else {
-      if (!addForm.name.trim() || !addForm.username.trim() || !addForm.password.trim()) { setAddError('Заполните все поля'); return; }
-      if (addForm.password.length < 6) { setAddError('Пароль не менее 6 символов'); return; }
-      if (users.find(u => u.username === addForm.username)) { setAddError('Имя пользователя занято'); return; }
-      const newUser: User = { name: addForm.name, username: addForm.username, password: addForm.password, avatar: addForm.name.charAt(0).toUpperCase() };
-      users.push(newUser);
-      localStorage.setItem('vector_users', JSON.stringify(users));
-      handleSwitch(newUser);
+    setAddLoading(true);
+    try {
+      let result;
+      if (addMode === 'login') {
+        if (!addForm.username.trim() || !addForm.password.trim()) { setAddError('Заполните все поля'); return; }
+        if (addForm.username.toLowerCase() === currentUser.username) { setAddError('Этот аккаунт уже активен'); return; }
+        result = await api.login(addForm.username, addForm.password);
+      } else {
+        if (!addForm.name.trim() || !addForm.username.trim() || !addForm.password.trim()) { setAddError('Заполните все поля'); return; }
+        result = await api.register(addForm.name, addForm.username, addForm.password);
+      }
+      const user: User = result.user;
+      const saved: User[] = JSON.parse(localStorage.getItem('vector_saved_accounts') || '[]');
+      if (!saved.find(u => u.username === user.username)) {
+        saved.push(user);
+        localStorage.setItem('vector_saved_accounts', JSON.stringify(saved));
+      }
+      handleSwitch(user);
+    } catch (err: unknown) {
+      setAddError(err instanceof Error ? err.message : 'Ошибка сервера');
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -128,9 +146,9 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
             className={`relative w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-200 ring-2 ${showAccounts ? 'ring-primary scale-110' : 'ring-transparent hover:ring-primary/50 hover:scale-105'} ${getColor(currentUser.username)}`}
           >
             {currentUser.name.charAt(0).toUpperCase()}
-            {otherUsers.length > 0 && (
+            {otherAccounts.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-[8px] text-primary-foreground flex items-center justify-center font-bold leading-none">
-                {otherUsers.length}
+                {otherAccounts.length}
               </span>
             )}
           </button>
@@ -162,7 +180,7 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
                       <Icon name="Check" size={16} className="text-primary shrink-0" />
                     </div>
 
-                    {otherUsers.map((user, i) => (
+                    {otherAccounts.map((user, i) => (
                       <button
                         key={user.username}
                         onClick={() => handleSwitch(user)}
@@ -260,8 +278,10 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
                   )}
                   <button
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 rounded-xl transition-all text-sm"
+                    disabled={addLoading}
+                    className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-semibold py-2 rounded-xl transition-all text-sm flex items-center justify-center gap-2"
                   >
+                    {addLoading && <Icon name="Loader" size={14} className="animate-spin" />}
                     {addMode === 'login' ? 'Войти' : 'Создать и войти'}
                   </button>
                 </form>

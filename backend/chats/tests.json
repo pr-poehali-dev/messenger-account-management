@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "Get chat list without user_id",
+      "method": "GET",
+      "path": "/?action=list",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "user_id required"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get messages without params",
+      "method": "GET",
+      "path": "/?action=messages",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "chat_id and user_id required"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get unread without user_id",
+      "method": "GET",
+      "path": "/?action=unread",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "user_id required"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
