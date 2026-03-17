@@ -40,6 +40,9 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [currentUser, setCurrentUser] = useState(initialUser);
   const [showAccounts, setShowAccounts] = useState(false);
+  const [addMode, setAddMode] = useState(false);
+  const [addForm, setAddForm] = useState({ username: '', password: '' });
+  const [addError, setAddError] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
 
   const allUsers: User[] = JSON.parse(localStorage.getItem('vector_users') || '[]');
@@ -49,6 +52,9 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         setShowAccounts(false);
+        setAddMode(false);
+        setAddError('');
+        setAddForm({ username: '', password: '' });
       }
     };
     if (showAccounts) document.addEventListener('mousedown', handler);
@@ -58,7 +64,18 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
   const handleSwitch = (user: User) => {
     localStorage.setItem('vector_current_user', JSON.stringify(user));
     setShowAccounts(false);
+    setAddMode(false);
     onSwitch(user);
+  };
+
+  const handleAddAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError('');
+    const users: User[] = JSON.parse(localStorage.getItem('vector_users') || '[]');
+    const found = users.find(u => u.username === addForm.username && u.password === addForm.password);
+    if (!found) { setAddError('Неверный логин или пароль'); return; }
+    if (found.username === currentUser.username) { setAddError('Этот аккаунт уже активен'); return; }
+    handleSwitch(found);
   };
 
   const renderView = () => {
@@ -108,51 +125,106 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
           </button>
 
           {showAccounts && (
-            <div className="absolute bottom-12 left-0 z-50 w-64 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-scale-in origin-bottom-left">
-              <div className="px-4 py-3 border-b border-border">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Аккаунты</p>
-              </div>
-
-              <div className="py-1">
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/8">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${getColor(currentUser.username)}`}>
-                    {currentUser.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{currentUser.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">@{currentUser.username}</p>
-                  </div>
-                  <Icon name="Check" size={16} className="text-primary shrink-0" />
-                </div>
-
-                {otherUsers.map((user, i) => (
-                  <button
-                    key={user.username}
-                    onClick={() => handleSwitch(user)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/60 transition-colors text-left animate-fade-in"
-                    style={{ animationDelay: `${i * 0.04}s` }}
-                  >
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${getColor(user.username)}`}>
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{user.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
-                    </div>
-                    <Icon name="ArrowRight" size={14} className="text-muted-foreground shrink-0" />
+            <div className="absolute bottom-12 left-0 z-50 w-68 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-scale-in origin-bottom-left" style={{ width: '272px' }}>
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                {addMode ? (
+                  <button onClick={() => { setAddMode(false); setAddError(''); setAddForm({ username: '', password: '' }); }} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                    <Icon name="ArrowLeft" size={13} />
+                    Назад
                   </button>
-                ))}
+                ) : (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Аккаунты</p>
+                )}
               </div>
 
-              <div className="border-t border-border py-1">
-                <button
-                  onClick={() => { setShowAccounts(false); onLogout(); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-destructive/10 text-destructive transition-colors text-left text-sm font-medium"
-                >
-                  <Icon name="LogOut" size={16} />
-                  Выйти
-                </button>
-              </div>
+              {!addMode ? (
+                <>
+                  <div className="py-1">
+                    <div className="flex items-center gap-3 px-4 py-2.5" style={{ background: 'hsl(var(--primary)/0.08)' }}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${getColor(currentUser.username)}`}>
+                        {currentUser.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{currentUser.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">@{currentUser.username}</p>
+                      </div>
+                      <Icon name="Check" size={16} className="text-primary shrink-0" />
+                    </div>
+
+                    {otherUsers.map((user, i) => (
+                      <button
+                        key={user.username}
+                        onClick={() => handleSwitch(user)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/60 transition-colors text-left animate-fade-in"
+                        style={{ animationDelay: `${i * 0.04}s` }}
+                      >
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${getColor(user.username)}`}>
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                        </div>
+                        <Icon name="ArrowRight" size={14} className="text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-border py-1">
+                    <button
+                      onClick={() => setAddMode(true)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/60 transition-colors text-left text-sm font-medium text-primary"
+                    >
+                      <Icon name="UserPlus" size={16} />
+                      Добавить аккаунт
+                    </button>
+                    <button
+                      onClick={() => { setShowAccounts(false); onLogout(); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-destructive/10 text-destructive transition-colors text-left text-sm font-medium"
+                    >
+                      <Icon name="LogOut" size={16} />
+                      Выйти
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <form onSubmit={handleAddAccount} className="p-4 space-y-3 animate-fade-in">
+                  <p className="text-sm font-medium">Войдите в другой аккаунт</p>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Имя пользователя</label>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="@username"
+                      value={addForm.username}
+                      onChange={e => setAddForm(f => ({ ...f, username: e.target.value }))}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Пароль</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={addForm.password}
+                      onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                    />
+                  </div>
+                  {addError && (
+                    <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 rounded-lg px-3 py-2 animate-fade-in">
+                      <Icon name="AlertCircle" size={12} />
+                      {addError}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 rounded-xl transition-all text-sm"
+                  >
+                    Войти
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>
