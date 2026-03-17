@@ -40,8 +40,8 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [currentUser, setCurrentUser] = useState(initialUser);
   const [showAccounts, setShowAccounts] = useState(false);
-  const [addMode, setAddMode] = useState(false);
-  const [addForm, setAddForm] = useState({ username: '', password: '' });
+  const [addMode, setAddMode] = useState<'login' | 'register' | null>(null);
+  const [addForm, setAddForm] = useState({ name: '', username: '', password: '' });
   const [addError, setAddError] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -52,9 +52,9 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         setShowAccounts(false);
-        setAddMode(false);
+        setAddMode(null);
         setAddError('');
-        setAddForm({ username: '', password: '' });
+        setAddForm({ name: '', username: '', password: '' });
       }
     };
     if (showAccounts) document.addEventListener('mousedown', handler);
@@ -64,7 +64,7 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
   const handleSwitch = (user: User) => {
     localStorage.setItem('vector_current_user', JSON.stringify(user));
     setShowAccounts(false);
-    setAddMode(false);
+    setAddMode(null);
     onSwitch(user);
   };
 
@@ -72,10 +72,21 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
     e.preventDefault();
     setAddError('');
     const users: User[] = JSON.parse(localStorage.getItem('vector_users') || '[]');
-    const found = users.find(u => u.username === addForm.username && u.password === addForm.password);
-    if (!found) { setAddError('Неверный логин или пароль'); return; }
-    if (found.username === currentUser.username) { setAddError('Этот аккаунт уже активен'); return; }
-    handleSwitch(found);
+
+    if (addMode === 'login') {
+      const found = users.find(u => u.username === addForm.username && u.password === addForm.password);
+      if (!found) { setAddError('Неверный логин или пароль'); return; }
+      if (found.username === currentUser.username) { setAddError('Этот аккаунт уже активен'); return; }
+      handleSwitch(found);
+    } else {
+      if (!addForm.name.trim() || !addForm.username.trim() || !addForm.password.trim()) { setAddError('Заполните все поля'); return; }
+      if (addForm.password.length < 6) { setAddError('Пароль не менее 6 символов'); return; }
+      if (users.find(u => u.username === addForm.username)) { setAddError('Имя пользователя занято'); return; }
+      const newUser: User = { name: addForm.name, username: addForm.username, password: addForm.password, avatar: addForm.name.charAt(0).toUpperCase() };
+      users.push(newUser);
+      localStorage.setItem('vector_users', JSON.stringify(users));
+      handleSwitch(newUser);
+    }
   };
 
   const renderView = () => {
@@ -128,7 +139,7 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
             <div className="absolute bottom-12 left-0 z-50 w-68 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-scale-in origin-bottom-left" style={{ width: '272px' }}>
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 {addMode ? (
-                  <button onClick={() => { setAddMode(false); setAddError(''); setAddForm({ username: '', password: '' }); }} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => { setAddMode(null); setAddError(''); setAddForm({ name: '', username: '', password: '' }); }} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
                     <Icon name="ArrowLeft" size={13} />
                     Назад
                   </button>
@@ -172,7 +183,7 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
 
                   <div className="border-t border-border py-1">
                     <button
-                      onClick={() => setAddMode(true)}
+                      onClick={() => setAddMode('login')}
                       className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/60 transition-colors text-left text-sm font-medium text-primary"
                     >
                       <Icon name="UserPlus" size={16} />
@@ -189,12 +200,42 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
                 </>
               ) : (
                 <form onSubmit={handleAddAccount} className="p-4 space-y-3 animate-fade-in">
-                  <p className="text-sm font-medium">Войдите в другой аккаунт</p>
+                  <div className="flex bg-secondary rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => { setAddMode('login'); setAddError(''); }}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${addMode === 'login' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Войти
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAddMode('register'); setAddError(''); }}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${addMode === 'register' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Создать
+                    </button>
+                  </div>
+
+                  {addMode === 'register' && (
+                    <div className="animate-fade-in">
+                      <label className="text-xs text-muted-foreground mb-1 block">Имя</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Ваше имя"
+                        value={addForm.name}
+                        onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                        className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Имя пользователя</label>
                     <input
                       type="text"
-                      autoFocus
+                      autoFocus={addMode === 'login'}
                       placeholder="@username"
                       value={addForm.username}
                       onChange={e => setAddForm(f => ({ ...f, username: e.target.value }))}
@@ -221,7 +262,7 @@ export default function MessengerApp({ currentUser: initialUser, onLogout, onSwi
                     type="submit"
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 rounded-xl transition-all text-sm"
                   >
-                    Войти
+                    {addMode === 'login' ? 'Войти' : 'Создать и войти'}
                   </button>
                 </form>
               )}
