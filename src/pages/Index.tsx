@@ -26,9 +26,20 @@ export default function Index() {
     setCurrentUser(null);
   };
 
+  const handleSwitch = (user: User) => {
+    setCurrentUser(user);
+  };
+
   if (!currentUser) {
     return <AuthScreen onAuth={handleAuth} />;
   }
 
-  return <MessengerApp currentUser={currentUser} onLogout={handleLogout} />;
+  return (
+    <MessengerApp
+      key={currentUser.username}
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      onSwitch={handleSwitch}
+    />
+  );
 }
